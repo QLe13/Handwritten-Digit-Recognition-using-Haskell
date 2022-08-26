@@ -1,0 +1,10 @@
+srcFile : DigitRecognition.hs
+exeFile : classifier
+
+builtIns:
+  - outOf
+  - hasFeature
+  - getFeature
+
+borings:
+  - outOf

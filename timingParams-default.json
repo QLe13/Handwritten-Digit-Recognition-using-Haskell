@@ -1,0 +1,28 @@
+[
+    [
+        "Project 1.full credit.buildCorpus implementation details.that buildCorpus is linear",
+        {
+            "showSteps": false,
+            "maxSteps": 12,
+            "initSteps": 9,
+            "minRuntime": 1,
+            "extendRange": false,
+            "maxTimeout": 5,
+            "maxBlowup": -1,
+            "benchMaxRunTime": 30
+        }
+    ],
+    [
+        "Project 1.full credit.that you avoid unnecessary work.",
+        {
+            "showSteps": false,
+            "maxSteps": 12,
+            "initSteps": 8,
+            "minRuntime": 2,
+            "extendRange": false,
+            "maxTimeout": 20,
+            "maxBlowup": -1,
+            "benchMaxRunTime": 30
+        }
+    ]
+]
