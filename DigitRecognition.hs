@@ -20,37 +20,15 @@ type Feature = Int
 type Digit = Integer
 -- Each image is of a specific digit, 0 through 9. To distinguish the labels or guesses from
 -- other numbers, we use a type alias.
+type DigitSummary = [(Digit, Summary)]
+type DigitCount = [(Digit, Int)]
+type Summary = [[(Int, Int)]]
 
 
 --                                      Primitive Functions
 -- These functions will be used in your implementation of the classifier. Be
 -- sure you understand how they are used, but you do not have to understand how they work.
 --
-
---hasFeature checks if an image has a specific feature: i.e. if that pixel is white or blank.
---
---This encapsulates the ugliness of storing images as nested lists. Notice the normally
---forbidden use of !!. This suggests that there should be a better way to handle and process
---images. For the purposes of this project we will accept this.  We can take reassurance that
---lists of length 28 are so short that better storage methods are probably unnecessary.
-hasFeature :: PixelImage -> Feature -> Bool
-hasFeature img ftr = 
-    let dim = length img
-        row = img !! (ftr `div` dim)
-        pixel = row !! (ftr `mod` dim)
-    in pixel
--- Example:    img `hasFeature` ftr
-
---outOf wraps around Haskell's built-in Rational data type. Rationals store fractional values
---precisely, with no possibility of underflow. Internally, the numerator and denominator are
---kept as Integers, which have no maximum outside the space limitations of computer memory. You
---will use this function to return an estimated probability. 
-outOf :: Int -> Int -> Rational
-outOf a b =  (fromIntegral a) % (fromIntegral b)
---Example:      2 `outOf` 10
---              (length [1..3]) `outOf` (length [1..10])
-   
-
 --                                       Milestone One
 
 -- Create a list of all possible digit labels. 
@@ -93,7 +71,10 @@ showPixelImage img = unlines [ helper x | x <- img]
 -- Example: lookupVal 'b' [('a', 8), ('b', 7), ('c', 9)]
 --          7
 lookupVal :: Eq a => a -> [(a, b)] -> b
-lookupVal key lst = head[snd tup| tup <- lst, fst tup==key ]
+lookupVal key lst 
+    | (length[snd tup| tup <- lst, fst tup==key ]) == 1 = head[snd tup| tup <- lst, fst tup==key ]
+    | (length[snd tup| tup <- lst, fst tup==key ]) < 1 = error "Digit not available"
+    | (length[snd tup| tup <- lst, fst tup==key ]) > 1 = error "More than one digit"
 
    
 --                                       Milestone Two
@@ -129,12 +110,33 @@ type Corpus = [(Digit, [PixelImage])]
 
 helper2 key imgLbls = [fst x | x <- imgLbls, snd x == key] 
 buildCorpus :: [(PixelImage, Digit)] -> Corpus
-buildCorpus imgLbls = [(x, helper2 x imgLbls) | x<-allDigits]
+setList imgLbls = nub [snd x | x <- imgLbls]
+buildCorpus imgLbls = [(x, helper2 x imgLbls) | x<-(setList imgLbls)]
 
 
 --
 --                                  Core Project 
-
+--outOf wraps around Haskell's built-in Rational data type. Rationals store fractional values
+--precisely, with no possibility of underflow. Internally, the numerator and denominator are
+--kept as Integers, which have no maximum outside the space limitations of computer memory. You
+--will use this function to return an estimated probability. 
+outOf :: Int -> Int -> Rational
+outOf a b =  (fromIntegral a) % (fromIntegral b)
+--Example:      2 `outOf` 10
+--              (length [1..3]) `outOf` (length [1..10])
+--hasFeature checks if an image has a specific feature: i.e. if that pixel is white or blank.
+--
+--This encapsulates the ugliness of storing images as nested lists. Notice the normally
+--forbidden use of !!. This suggests that there should be a better way to handle and process
+--images. For the purposes of this project we will accept this.  We can take reassurance that
+--lists of length 28 are so short that better storage methods are probably unnecessary.
+hasFeature :: PixelImage -> Feature -> Bool
+hasFeature img ftr = 
+    let dim = length img
+        row = img !! (ftr `div` dim)
+        pixel = row !! (ftr `mod` dim)
+    in pixel
+-- Example:    img `hasFeature` ftr
 -- Given a corpus and a specific digit Y, probOfDigit estimates P(Y). This is the fraction
 -- of the images in the corpus that are labeled with Y.  You will need to use `outOf` to create
 -- the fraction.
@@ -142,22 +144,30 @@ buildCorpus imgLbls = [(x, helper2 x imgLbls) | x<-allDigits]
 -- Example: probOfDigit corpus 9
 --         2 % 3
 probOfDigit :: Corpus -> Digit -> Rational
-probOfDigit corpus digit = 
-    undefined
+--digitCorpusImages :: Corpus -> Digit -> Int
+--digitCorpusImages corpus digit = sum([length (snd x) | x <- corpus, fst x == digit]) 
+probOfDigit corpus digit = outOf (sum([length (snd x) | x <- corpus, fst x == digit])) (sum([length(snd x) | x <- corpus]))
+
 
 -- Given the list of images (imgs) labeled for a given digit Y, and a feature F (ftr),
 -- probOfFeature imgs ftr estimates the probability P(ftr=Black | Y). See the assignment page for
 -- details.
 probOfFeature :: [PixelImage] -> Feature -> Rational
-probOfFeature imgs ftr =
-    undefined
+
+probOfFeature imgs ftr 
+    | (length[x | x <- imgs, hasFeature x ftr == True ]) == 0 = outOf (1+(length[x | x <- imgs, hasFeature x ftr == True ])) ( length imgs +2)
+    | (length[x | x <- imgs, hasFeature x ftr == True ]) == (length imgs) = outOf (1+ length[x | x <- imgs, hasFeature x ftr == True ]) (length imgs +2)
+    | otherwise = outOf (1+ length[x | x <- imgs, hasFeature x ftr == True ]) (length imgs +2)
+
 
 -- Given the list of images (imgs) labeled for a given digit Y, and a feature F (ftr),
 -- probOfNoFeature imgs ftr estimates the probability P(ftr=White | Y). See the assignment page
 -- for details.
 probOfNoFeature :: [PixelImage] -> Feature -> Rational
-probOfNoFeature imgs ftr = 
-    undefined
+probOfNoFeature imgs ftr 
+    | (length[x | x <- imgs, hasFeature x ftr == False ]) == 0 = outOf (1+(length[x | x <- imgs, hasFeature x ftr == False ])) ( length imgs +2)
+    | (length[x | x <- imgs, hasFeature x ftr == False ]) == (length imgs) = outOf (1+ length[x | x <- imgs, hasFeature x ftr == False ]) (length imgs +2)
+    | otherwise = outOf (1+ length[x | x <- imgs, hasFeature x ftr == False ]) (length imgs +2)
 
 -- rankOfDigit should estimate the rank of a given digit for a given instance, as specified on
 -- the assignment page.
@@ -165,9 +175,13 @@ probOfNoFeature imgs ftr =
 -- You may find the (product) function helpful.
 -- I recommend you calculate the values for positive features (those that occur in newImg)
 -- and negative features (those that do not occur in newImg) separately.
+
+--type Corpus = [(Digit, [PixelImage])]
 rankOfDigit :: Corpus -> Digit -> PixelImage -> Rational
-rankOfDigit corpus digit newImg = 
-    undefined
+oneDigit corpus digit = head[ y | (x,y) <- corpus, x == digit]
+prodOfPos corpus digit newImg = product[probOfFeature (oneDigit corpus digit) x | x <- allFeatures, hasFeature newImg x == True]
+prodOfNeg corpus digit newImg = product[probOfNoFeature (oneDigit corpus digit) x | x <- allFeatures, hasFeature newImg x == False]
+rankOfDigit corpus digit newImg = product[(probOfDigit corpus digit), (prodOfNeg corpus digit newImg), (prodOfPos corpus digit newImg) ]
 
 -- classifyImage should return the most likely digit, based on the rank computed by rankOfDigit.
 -- You will need to use the maximum function.
@@ -178,9 +192,12 @@ rankOfDigit corpus digit newImg =
 --   greater than 0. If it is not, you should print an error message. However, you will get errors
 --   until smoothing is working correctly, so don't insert that check until then! 
 --   This is not worth any points!
+
 classifyImage :: Corpus -> PixelImage -> Digit
-classifyImage corpus newImg = 
-    undefined
+rankTup :: Corpus -> PixelImage -> [(Rational,Digit)]
+rankTup corpus newImg = [ (rankOfDigit corpus x newImg,x) | x <- allDigits ]
+classifyImage corpus newImg = snd (maximum (rankTup corpus newImg))
+
 
 --                                  Optional Helpful Functions
 -- These functions are optional, but may be helpful with debugging. They are not worth any points.
