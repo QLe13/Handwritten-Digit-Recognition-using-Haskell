@@ -20,9 +20,7 @@ type Feature = Int
 type Digit = Integer
 -- Each image is of a specific digit, 0 through 9. To distinguish the labels or guesses from
 -- other numbers, we use a type alias.
-type DigitSummary = [(Digit, Summary)]
-type DigitCount = [(Digit, Int)]
-type Summary = [[(Int, Int)]]
+
 
 
 --                                      Primitive Functions
@@ -82,7 +80,8 @@ lookupVal key lst
 -- A corpus is an association list between digits and the images that are labeled with that
 -- digit. By storing the information this way, we avoid the frequent computation of which images
 -- are labeled with which digit. 
-type Corpus = [(Digit, [PixelImage])]
+
+--type Corpus = [(Digit, [PixelImage])]
 
 -- When we read in the files, we get a list of image-label tuples. It is far more efficient to
 -- group the images by their label as a Corpus. buildCorpus takes the list of tuples and
@@ -109,9 +108,39 @@ type Corpus = [(Digit, [PixelImage])]
 --           [(9, [ [[True, False]], [[False, True]] ]), (2, [[[False, False]]])]
 
 helper2 key imgLbls = [fst x | x <- imgLbls, snd x == key] 
-buildCorpus :: [(PixelImage, Digit)] -> Corpus
+
 setList imgLbls = nub [snd x | x <- imgLbls]
-buildCorpus imgLbls = [(x, helper2 x imgLbls) | x<-(setList imgLbls)]
+
+type DigitSummary = [(Digit, Summary)]
+type DigitCount = [(Digit, Int)]
+type Summary = [[(Int, Int)]]
+type Corpus = (DigitCount, DigitSummary)
+
+--helper function for DigitCount
+--countDigit :: [(PixelImage, Digit)] -> DigitCount
+countDigit imgLbls = [(x, length (helper2 x imgLbls)) | x<-(setList imgLbls)]
+
+
+helperTuple imgLbls digit ftr = 
+                                let y = helper2 digit imgLbls
+                                    a = length y
+                                    b = length [1 | x<-y, hasFeature x ftr == True ]
+                                in (b, a-b) 
+
+summary :: [(PixelImage, Digit)] -> Digit -> Summary
+featureGrid :: [[Feature]]
+featureGrid = chunksOf 28 allFeatures
+summary imgLbls digit = [[helperTuple imgLbls digit ftr | ftr <- line] | line <- featureGrid]
+
+--summaDigit :: [(PixelImage, Digit)] -> DigitSummary
+--summaDigit imgLbls = [(x, summary imgLbls x) | x<- (setList imgLbls)]
+buildCorpus :: [(PixelImage, Digit)] -> Corpus
+buildCorpus imgLbls = 
+                     let list = setList imgLbls
+                     in ( [(x, length (helper2 x imgLbls)) | x<-list], [(x, summary imgLbls x) | x<- list])
+
+
+
 
 
 --
@@ -146,28 +175,43 @@ hasFeature img ftr =
 probOfDigit :: Corpus -> Digit -> Rational
 --digitCorpusImages :: Corpus -> Digit -> Int
 --digitCorpusImages corpus digit = sum([length (snd x) | x <- corpus, fst x == digit]) 
-probOfDigit corpus digit = outOf (sum([length (snd x) | x <- corpus, fst x == digit])) (sum([length(snd x) | x <- corpus]))
-
+probOfDigit corpus digit = outOf (sum [snd x | x <- fst corpus, fst x == digit]) (sum [snd x | x <- fst corpus])
+--outOf (sum [snd x | x <- fst corpus, fst x == digit]) (sum [snd x | x <- fst corpus]) (better)
+--outOf (sum([length (snd x) | x <- corpus, fst x == digit])) (sum([length(snd x) | x <- corpus]))
 
 -- Given the list of images (imgs) labeled for a given digit Y, and a feature F (ftr),
 -- probOfFeature imgs ftr estimates the probability P(ftr=Black | Y). See the assignment page for
 -- details.
-probOfFeature :: [PixelImage] -> Feature -> Rational
+getFeature :: Summary -> Feature -> (Int, Int)
+getFeature sum ind = 
+    let row = sum !! (ind `div` 28)
+        val = row !! (ind `mod` 28)
+    in val
 
-probOfFeature imgs ftr 
-    | (length[x | x <- imgs, hasFeature x ftr == True ]) == 0 = outOf (1+(length[x | x <- imgs, hasFeature x ftr == True ])) ( length imgs +2)
-    | (length[x | x <- imgs, hasFeature x ftr == True ]) == (length imgs) = outOf (1+ length[x | x <- imgs, hasFeature x ftr == True ]) (length imgs +2)
-    | otherwise = outOf (1+ length[x | x <- imgs, hasFeature x ftr == True ]) (length imgs +2)
+probOfFeature :: Summary -> Feature -> Rational
+--probOfFeature :: [PixelImage] -> Feature -> Rational
+probOfFeature summary ftr = outOf (1+ fst (getFeature summary ftr)) (fst (getFeature summary ftr) + snd(getFeature summary ftr) + 2)
+    -- outOf (1+fst (getFeature (snd (head(snd corpus))) ftr)) (2 + sum (getFeature (snd (head(snd corpus))) ftr))
+--Corpus->Digit->Feature->Rational    --outOf (1+ (fst (getFeature (snd (head [x | x <- snd corpus , fst x == digit])) ftr))) (2+ (sum(getFeature (snd (head [x | x <- snd corpus , fst x == digit])) ftr)))
+
+   
+--    | (length[x | x <- imgs, hasFeature x ftr == True ]) == 0 = outOf (1+(length[x | x <- imgs, hasFeature x ftr == True ])) ( length imgs +2)
+--    | (length[x | x <- imgs, hasFeature x ftr == True ]) == (length imgs) = outOf (1+ length[x | x <- imgs, hasFeature x ftr == True ]) (length imgs +2)
+--    | otherwise = outOf (1+ length[x | x <- imgs, hasFeature x ftr == True ]) (length imgs +2)
 
 
 -- Given the list of images (imgs) labeled for a given digit Y, and a feature F (ftr),
 -- probOfNoFeature imgs ftr estimates the probability P(ftr=White | Y). See the assignment page
 -- for details.
-probOfNoFeature :: [PixelImage] -> Feature -> Rational
-probOfNoFeature imgs ftr 
-    | (length[x | x <- imgs, hasFeature x ftr == False ]) == 0 = outOf (1+(length[x | x <- imgs, hasFeature x ftr == False ])) ( length imgs +2)
-    | (length[x | x <- imgs, hasFeature x ftr == False ]) == (length imgs) = outOf (1+ length[x | x <- imgs, hasFeature x ftr == False ]) (length imgs +2)
-    | otherwise = outOf (1+ length[x | x <- imgs, hasFeature x ftr == False ]) (length imgs +2)
+probOfNoFeature :: Summary -> Feature -> Rational
+--probOfNoFeature :: [PixelImage] -> Feature -> Rational
+probOfNoFeature summary ftr = outOf (1+ snd (getFeature summary ftr)) (fst (getFeature summary ftr) + snd(getFeature summary ftr) + 2)
+    --outOf (1+snd (getFeature (snd (head(snd corpus))) ftr)) (2 + sum (getFeature (snd (head(snd corpus))) ftr))
+--Corpus->Digit->Feature->Rational     --outOf (1+ (snd (getFeature (snd (head [x | x <- snd corpus , fst x == digit])) ftr))) (2+ (sum (getFeature (snd (head [x | x <- snd corpus , fst x == digit])) ftr)))
+
+--    | (length[x | x <- imgs, hasFeature x ftr == False ]) == 0 = outOf (1+(length[x | x <- imgs, hasFeature x ftr == False ])) ( length imgs +2)
+--    | (length[x | x <- imgs, hasFeature x ftr == False ]) == (length imgs) = outOf (1+ length[x | x <- imgs, hasFeature x ftr == False ]) (length imgs +2)
+--    | otherwise = outOf (1+ length[x | x <- imgs, hasFeature x ftr == False ]) (length imgs +2)
 
 -- rankOfDigit should estimate the rank of a given digit for a given instance, as specified on
 -- the assignment page.
@@ -178,9 +222,10 @@ probOfNoFeature imgs ftr
 
 --type Corpus = [(Digit, [PixelImage])]
 rankOfDigit :: Corpus -> Digit -> PixelImage -> Rational
-oneDigit corpus digit = head[ y | (x,y) <- corpus, x == digit]
-prodOfPos corpus digit newImg = product[probOfFeature (oneDigit corpus digit) x | x <- allFeatures, hasFeature newImg x == True]
-prodOfNeg corpus digit newImg = product[probOfNoFeature (oneDigit corpus digit) x | x <- allFeatures, hasFeature newImg x == False]
+--oneDigit corpus digit = head[ y | (x,y) <- corpus, x == digit]
+prodOfPos :: Corpus -> Digit -> PixelImage -> Rational
+prodOfPos corpus digit newImg = product[probOfFeature ((snd (head [x | x <- snd corpus , fst x == digit]))) y | y <- allFeatures, hasFeature newImg y == True]
+prodOfNeg corpus digit newImg = product[probOfNoFeature ((snd (head [x | x <- snd corpus , fst x == digit]))) y | y <- allFeatures, hasFeature newImg y == False]
 rankOfDigit corpus digit newImg = product[(probOfDigit corpus digit), (prodOfNeg corpus digit newImg), (prodOfPos corpus digit newImg) ]
 
 -- classifyImage should return the most likely digit, based on the rank computed by rankOfDigit.
