@@ -6,9 +6,7 @@ import DigitRecognition
 
 
 --                                  Image Reading Functions
--- These functions are used to turn strings into PixelImages and Digits. You will not need to
--- call these functions, but understanding how they work may help with showPixelImage in
--- DigitRecognition.hs.
+-- These functions are used to turn strings into PixelImages and Digits. 
 --
 isGoodImage :: [String] -> Bool
 -- isGoodImage ensures that the input list is 28 lines long, and that
@@ -61,7 +59,6 @@ readLabeledImages imgStr lblStr =
 
 --Black magic functions
 -- sortCorpus is used to keeps everything nice and sorted, so equality can be checked. 
--- You should never need to use this function.
 sortCorpus corpus = sort [(label, sort images) | (label, images) <- corpus]
 
 pixelImagesFromFile :: String -> IO [PixelImage]
